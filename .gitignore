@@ -1,0 +1,4 @@
+heart_env/ 
+*.zip 
+--pycache--/ 
+*.pyc 
