@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 def plot_waveform(signal, sample_rate, save_path="outputs/waveform.png"):
     duration = len(signal) / sample_rate
@@ -109,19 +110,100 @@ def plot_heartbeat_graph(filtered_signal, sample_rate, peak_times, labels, save_
     duration = len(filtered_signal) / sample_rate
     time = np.linspace(0, duration, len(filtered_signal))
 
-    plt.figure(figsize=(14, 4))
-    plt.plot(time, filtered_signal, linewidth=0.6)
+    plt.figure(figsize=(14, 5))
+    plt.plot(time, filtered_signal, linewidth=0.6, color='#1f77b4')
+
+    # Stable Y-limit calculations using absolute span
+    y_min, y_max = plt.ylim()
+    y_span = y_max - y_min
+    bracket_y = y_min - (y_span * 0.15)
+
+    for i in range(len(peak_times) - 1):
+        t1 = peak_times[i]
+        t2 = peak_times[i+1]
+        l1 = labels[i]
+        
+        interval_ms = (t2 - t1) * 1000
+        
+        if l1 == "S1":
+            plt.axvspan(t1, t2, color='red', alpha=0.1, label='Systole' if i==0 else "")
+            plt.annotate('', xy=(t1, bracket_y), xytext=(t2, bracket_y),
+                         arrowprops=dict(arrowstyle='|-|', color='gray', lw=1.5))
+            plt.text((t1+t2)/2, bracket_y, f"{interval_ms:.0f} ms\n(Systole)", 
+                     ha='center', va='top', fontsize=9, color='gray')
+                     
+        else:
+            plt.annotate('', xy=(t1, bracket_y), xytext=(t2, bracket_y),
+                         arrowprops=dict(arrowstyle='|-|', color='gray', lw=1.5))
+            plt.text((t1+t2)/2, bracket_y, f"{interval_ms:.0f} ms\n(Diastole)", 
+                     ha='center', va='top', fontsize=9, color='gray')
 
     for t, label in zip(peak_times, labels):
         idx = int(t * sample_rate)
         if idx < len(filtered_signal):
             color = 'red' if label == "S1" else 'green'
             plt.scatter(t, filtered_signal[idx], color=color, zorder=5)
-            plt.annotate(label, (t, filtered_signal[idx]), textcoords="offset points", xytext=(0, 8), ha='center')
+            plt.annotate(label, (t, filtered_signal[idx]), textcoords="offset points", 
+                         xytext=(0, 8), ha='center', fontweight='bold')
 
-    plt.title("Annotated Heartbeat Graph")
+    plt.title("Annotated Heartbeat Graph (Systole vs Diastole)")
     plt.xlabel("Time (s)")
     plt.ylabel("Amplitude")
+    
+    # Apply the stable Y-limits
+    plt.ylim(bracket_y - (y_span * 0.15), y_max + (y_span * 0.1))
+    
+    handles, legend_labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(legend_labels, handles))
+    if by_label:
+        plt.legend(by_label.values(), by_label.keys(), loc='upper right')
+
     plt.tight_layout()
     plt.savefig(save_path)
     plt.show()
+
+def create_animated_waveform_gif(signal, sample_rate, save_path="outputs/animated_waveform.gif", fps=30):
+    """
+    Generates an animated GIF of the waveform extending over time.
+    """
+    duration = len(signal) / sample_rate
+    time_array = np.linspace(0, duration, len(signal))
+
+    fig, ax = plt.subplots(figsize=(10, 3))
+    
+    # Set static limits so the axes don't jump around
+    y_min, y_max = np.min(signal), np.max(signal)
+    y_pad = (y_max - y_min) * 0.1
+    ax.set_xlim(0, duration)
+    ax.set_ylim(y_min - y_pad, y_max + y_pad)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Amplitude")
+    ax.set_title("Animated Heart Sound Waveform")
+
+    # Initialize an empty line
+    line, = ax.plot([], [], lw=1.0, color='#1f77b4')
+
+    # Calculate how many samples to reveal per frame to hit our target FPS
+    samples_per_frame = int(sample_rate / fps)
+    total_frames = len(signal) // samples_per_frame
+
+    def init():
+        line.set_data([], [])
+        return line,
+
+    def update(frame):
+        # Calculate the index up to which we should draw the signal
+        end_idx = (frame + 1) * samples_per_frame
+        line.set_data(time_array[:end_idx], signal[:end_idx])
+        return line,
+
+    # Create the animation
+    ani = animation.FuncAnimation(
+        fig, update, frames=total_frames, init_func=init, blit=True
+    )
+    
+    # Save as GIF using Pillow 
+    ani.save(save_path, writer=animation.PillowWriter(fps=fps))
+    plt.close(fig)
+    
+    return save_path
