@@ -1,6 +1,8 @@
 import unittest
+import io
 
 import numpy as np
+import soundfile as sf
 
 import audio_processing as dsp
 
@@ -19,6 +21,18 @@ class AudioProcessingTests(unittest.TestCase):
         self.assertLess(np.max(np.abs(decoded - self.tone)), 0.001)
         with self.assertRaises(ValueError):
             dsp.read_audio(dsp.wav_bytes(self.tone[:100], self.rate))
+
+    def test_browser_playback_upsamples_low_rate_without_changing_duration(self):
+        original_rate = 2000  # The bundled heart sound recordings use this rate.
+        low_rate_tone = self.tone[::self.rate // original_rate]
+        playback = dsp.playback_wav_bytes(low_rate_tone, original_rate)
+        info = sf.info(io.BytesIO(playback))
+        self.assertEqual(info.samplerate, dsp.MIN_PLAYBACK_RATE)
+        self.assertEqual(info.subtype, "PCM_16")
+        self.assertAlmostEqual(info.duration, len(low_rate_tone) / original_rate,
+                               places=3)
+        self.assertEqual(dsp.playback_wav_bytes(self.tone, self.rate),
+                         dsp.wav_bytes(self.tone, self.rate))
 
     def test_five_minute_limit(self):
         rate = 1000
@@ -47,6 +61,30 @@ class AudioProcessingTests(unittest.TestCase):
         self.assertEqual(len(edited), len(self.tone))
         self.assertLess(np.sqrt(np.mean(edited ** 2)),
                         0.5 * np.sqrt(np.mean(self.tone ** 2)))
+
+    def test_frequency_filter_keeps_selected_bands(self):
+        time = np.arange(self.rate) / self.rate
+        tones = {frequency: np.sin(2 * np.pi * frequency * time)
+                 for frequency in (200, 2000, 6000)}
+        mixed = sum(0.2 * tone for tone in tones.values()).astype(np.float32)
+
+        def level(samples, frequency):
+            return abs(2 * np.dot(samples, tones[frequency]) / len(samples))
+
+        cases = [
+            ("Low pass", 500, None, 200, 6000),
+            ("High pass", 4000, None, 6000, 200),
+            ("Band pass", 1000, 3000, 2000, 200),
+            ("Band stop", 1000, 3000, 200, 2000),
+        ]
+        for kind, low, high, kept, removed in cases:
+            with self.subTest(kind=kind):
+                filtered = dsp.frequency_filter(mixed, self.rate, kind, low, high)
+                self.assertEqual(len(filtered), len(mixed))
+                self.assertGreater(level(filtered, kept), 0.14)
+                self.assertLess(level(filtered, removed), 0.06)
+        with self.assertRaises(ValueError):
+            dsp.frequency_filter(mixed, self.rate, "Band pass", 3000, 1000)
 
     def test_pitch_and_delay(self):
         pitch = dsp.detect_pitch(self.tone, self.rate, 0.5)

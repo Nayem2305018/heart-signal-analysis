@@ -12,6 +12,7 @@ from scipy import signal
 
 MAX_SECONDS = 5 * 60
 REDUCED_OVERLAP_AFTER_SECONDS = 120
+MIN_PLAYBACK_RATE = 16000
 
 
 def _too_long_message() -> str:
@@ -36,6 +37,16 @@ def wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
     buffer = io.BytesIO()
     sf.write(buffer, np.clip(audio, -1, 1), sample_rate, format="WAV", subtype="PCM_16")
     return buffer.getvalue()
+
+
+def playback_wav_bytes(audio: np.ndarray, sample_rate: int) -> bytes:
+    """Make a PCM WAV at a rate that browser audio decoders can play."""
+    if sample_rate < MIN_PLAYBACK_RATE:
+        divisor = math.gcd(sample_rate, MIN_PLAYBACK_RATE)
+        audio = signal.resample_poly(audio, MIN_PLAYBACK_RATE // divisor,
+                                     sample_rate // divisor)
+        sample_rate = MIN_PLAYBACK_RATE
+    return wav_bytes(audio, sample_rate)
 
 
 def stft(audio: np.ndarray, sample_rate: int):
@@ -104,6 +115,31 @@ def equalize(audio: np.ndarray, sample_rate: int, bass: float, mids: float,
     result += low * 10 ** (bass / 20)
     result += high * 10 ** (treble / 20)
     return result
+
+
+def frequency_filter(audio: np.ndarray, sample_rate: int, kind: str,
+                     low_hz: float, high_hz: float | None = None) -> np.ndarray:
+    """Apply a stable fourth-order low, high, band-pass, or band-stop filter."""
+    types = {"Low pass": "lowpass", "High pass": "highpass",
+             "Band pass": "bandpass", "Band stop": "bandstop"}
+    if kind not in types:
+        raise ValueError("Choose a valid frequency filter type.")
+    if not np.isfinite(sample_rate) or sample_rate <= 0:
+        raise ValueError("Sample rate must be positive.")
+    if len(audio) < 2:
+        raise ValueError("Choose a longer recording for frequency filtering.")
+    nyquist = sample_rate / 2
+    if not np.isfinite(low_hz) or not 0 < low_hz < nyquist:
+        raise ValueError("Cutoff must be between 0 Hz and the Nyquist frequency.")
+    cutoff: float | tuple[float, float] = low_hz
+    if kind in ("Band pass", "Band stop"):
+        if high_hz is None or not np.isfinite(high_hz) or not low_hz < high_hz < nyquist:
+            raise ValueError("The upper cutoff must be above the lower cutoff and below Nyquist.")
+        cutoff = (low_hz, high_hz)
+    sos = signal.butter(4, cutoff, btype=types[kind], fs=sample_rate, output="sos")
+    # Zero-phase filtering keeps events aligned with the original waveform.
+    padlen = min(len(audio) - 2, 3 * (2 * len(sos) + 1))
+    return signal.sosfiltfilt(sos, audio, padlen=padlen).astype(np.float32)
 
 
 def room_simulate(audio: np.ndarray, sample_rate: int, room: str,

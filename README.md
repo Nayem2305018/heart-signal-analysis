@@ -27,8 +27,14 @@ frequency bars, and spectrogram use browser microphone access for display;
 turn that display off before recording. Each analysis plot has a PNG download;
 edited sounds have WAV downloads.
 
+The **Frequency filter** tool offers low pass, high pass, band pass, and band
+stop filters with adjustable cutoff frequencies. It plays the original and
+filtered clips side by side and shows their waveforms and spectra.
+
 Audio is converted to mono for analysis. Files must be between 0.1 seconds and
 5 minutes. The noise remover uses a spectral gate, the pitch tuner analyzes a
 short window at the selected time, and beat detection uses spectral onset
 peaks. Long spectrograms use a bounded visual preview; edits still process the
-full recording. These results are estimates and depend on the recording quality.
+full recording. Players convert low sample rate audio to 16 kHz PCM WAV for
+browser playback; analysis and WAV downloads retain their original sample rate.
+These results are estimates and depend on the recording quality.

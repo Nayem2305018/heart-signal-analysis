@@ -54,10 +54,10 @@ def _comparison(original: np.ndarray, edited: np.ndarray, sample_rate: int,
     left, right = st.columns(2)
     with left:
         st.caption("Original")
-        st.audio(dsp.wav_bytes(original, sample_rate), format="audio/wav")
+        st.audio(dsp.playback_wav_bytes(original, sample_rate), format="audio/wav")
     with right:
         st.caption("Processed")
-        st.audio(dsp.wav_bytes(edited, sample_rate), format="audio/wav")
+        st.audio(dsp.playback_wav_bytes(edited, sample_rate), format="audio/wav")
     fig, axes = plt.subplots(2, 1, figsize=(11, 5), constrained_layout=True)
     _waveform(axes[0], original, sample_rate, "Original")
     _waveform(axes[0], edited, sample_rate, "Processed", "#ff8398")
@@ -156,7 +156,7 @@ def _live_visualizer() -> None:
 
 
 def _beat_player(audio: np.ndarray, sample_rate: int, beats: np.ndarray) -> None:
-    source = base64.b64encode(dsp.wav_bytes(audio, sample_rate)).decode("ascii")
+    source = base64.b64encode(dsp.playback_wav_bytes(audio, sample_rate)).decode("ascii")
     times = json.dumps(beats.tolist())
     html = f"""
     <div style="box-sizing:border-box;text-align:center;background:#142239;padding:14px;border-radius:8px;color:white">
@@ -200,7 +200,7 @@ def _open_recording_analysis() -> None:
 
 def render_audio_analyzer() -> None:
     render_hero("audio")
-    mode = st.sidebar.radio("Audio tool", ["Live", "Analyze", "Noise & EQ",
+    mode = st.sidebar.radio("Audio tool", ["Live", "Analyze", "Frequency filter", "Noise & EQ",
                              "Rooms & effects", "Beats & pitch",
                              "Spectrogram painter", "Compare"], key="audio_tool")
     live_enabled = False
@@ -222,7 +222,8 @@ def render_audio_analyzer() -> None:
                 st.warning(st.session_state["general_recording_error"])
         if microphone_bytes is not None:
             st.caption("Recording saved. Play it back or choose a tool below.")
-            st.audio(microphone_bytes, format="audio/wav")
+            recording_audio, recording_rate = dsp.read_audio(microphone_bytes)
+            st.audio(dsp.playback_wav_bytes(recording_audio, recording_rate), format="audio/wav")
             if not recorder_open:
                 st.button("Record another clip", on_click=_record_another_clip,
                           key="record_another_clip")
@@ -255,7 +256,7 @@ def render_audio_analyzer() -> None:
         a.metric("Duration", f"{duration:.2f} s")
         b.metric("Sample rate", f"{sample_rate:,} Hz")
         c.metric("Peak", f"{np.max(np.abs(audio)):.2f}")
-        st.audio(dsp.wav_bytes(audio, sample_rate), format="audio/wav")
+        st.audio(dsp.playback_wav_bytes(audio, sample_rate), format="audio/wav")
         fig, axes = plt.subplots(4, 1, figsize=(11, 10), constrained_layout=True)
         _waveform(axes[0], audio, sample_rate, "Audio")
         loud_time, loud_db = dsp.loudness(audio, sample_rate)
@@ -267,6 +268,37 @@ def render_audio_analyzer() -> None:
         _plot(fig, "audio_analysis", "analysis_plot")
         st.download_button("Download original WAV", dsp.wav_bytes(audio, sample_rate),
                            file_name="original.wav", mime="audio/wav", key="original_wav")
+
+    if mode == "Frequency filter":
+        st.subheader("Frequency filter")
+        st.write("Choose which frequencies to keep or remove, then compare the sound and spectrum.")
+        highest_hz = int(min(20000, np.floor(sample_rate * 0.475)))
+        if highest_hz < 21:
+            st.warning("This recording's sample rate is too low for the frequency filter controls.")
+        else:
+            filter_kind = st.selectbox("Filter type", ["Low pass", "High pass",
+                                                       "Band pass", "Band stop"])
+            filtered = None
+            if filter_kind in ("Low pass", "High pass"):
+                default_hz = (min(3000, int(highest_hz * 0.7)) if filter_kind == "Low pass"
+                              else min(200, int(highest_hz * 0.25)))
+                cutoff_hz = st.slider("Cutoff frequency (Hz)", 10, highest_hz,
+                                      max(10, default_hz), 1)
+                filtered = dsp.frequency_filter(audio, sample_rate, filter_kind, cutoff_hz)
+                st.caption(f"{filter_kind}: {cutoff_hz:,} Hz cutoff")
+            else:
+                lower = min(highest_hz - 1, max(10, min(80, highest_hz // 4)))
+                upper = max(lower + 1, min(4000, int(highest_hz * 0.8)))
+                lower_hz, upper_hz = st.slider("Frequency range (Hz)", 10, highest_hz,
+                                               (lower, upper), 1)
+                if lower_hz == upper_hz:
+                    st.info("Move the range handles apart to apply the filter.")
+                else:
+                    filtered = dsp.frequency_filter(audio, sample_rate, filter_kind,
+                                                     lower_hz, upper_hz)
+                    st.caption(f"{filter_kind}: {lower_hz:,}–{upper_hz:,} Hz")
+            if filtered is not None:
+                _comparison(audio, filtered, sample_rate, "frequency_filtered", "frequency_filter")
 
     if mode == "Noise & EQ":
         st.subheader("Noise remover")
@@ -353,8 +385,8 @@ def render_audio_analyzer() -> None:
                                                   second_rate // divisor)
                 st.caption("The recordings are aligned at their starts; different sample rates are resampled.")
                 left, right = st.columns(2)
-                left.audio(dsp.wav_bytes(audio, sample_rate), format="audio/wav")
-                right.audio(dsp.wav_bytes(second, sample_rate), format="audio/wav")
+                left.audio(dsp.playback_wav_bytes(audio, sample_rate), format="audio/wav")
+                right.audio(dsp.playback_wav_bytes(second, sample_rate), format="audio/wav")
                 fig, axes = plt.subplots(3, 1, figsize=(11, 8), constrained_layout=True)
                 _waveform(axes[0], audio, sample_rate, "First")
                 _waveform(axes[0], second, sample_rate, "Second", "#ff8398")

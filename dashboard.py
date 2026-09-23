@@ -15,6 +15,8 @@ from models.peak_detection import (
 )
 from views.plots import create_animated_waveform_gif
 from ui_theme import apply_theme, render_empty_state, render_hero, render_sidebar_brand
+from audio_processing import playback_wav_bytes
+from heart_animation import heart_animation_html
 
 
 HEART_ANALYSIS_SECONDS = 20
@@ -49,6 +51,7 @@ if source_bytes is not None:
     if signal.ndim > 1:
         signal = signal[:, 0]  # use one channel if stereo
 
+    playback_signal = signal
     # Use a 20-second segment for every heart analysis; keep the GIF shorter.
     signal = signal[:HEART_ANALYSIS_SECONDS * sample_rate]
     st.caption(f"Analyzing {len(signal) / sample_rate:.2f} s of audio "
@@ -86,7 +89,7 @@ if source_bytes is not None:
             st.image(gif_path, use_container_width=True)
 
     # ---------- Audio playback: original ----------
-    st.audio(source_bytes, format="audio/wav")
+    st.audio(playback_wav_bytes(playback_signal, sample_rate), format="audio/wav")
 
     # ---------- FFT Spectrum ----------
     st.header("2. Frequency Spectrum (FFT)")
@@ -141,11 +144,8 @@ if source_bytes is not None:
     st.pyplot(fig4)
 
     # ---------- Filtered audio playback ----------
-    filtered_buffer = io.BytesIO()
-    sf.write(filtered_buffer, filtered_signal, sample_rate, format='WAV')
-    filtered_buffer.seek(0)
     st.write("**Filtered audio:**")
-    st.audio(filtered_buffer, format="audio/wav")
+    st.audio(playback_wav_bytes(filtered_signal, sample_rate), format="audio/wav")
 
     # ---------- 4. Beat timing ----------
     st.header("4. Beat Timing Analysis")
@@ -183,39 +183,9 @@ if source_bytes is not None:
                "S1/S2 labels and the shaded spans are approximate; "
                "an ECG is used to assess suspected arrhythmia.")
 
-    # Feature: Synchronized Heart Animation
+    # The illustration uses the estimated average rate, not individual sound times.
     if heart_rate:
-        pulse_duration = 60.0 / heart_rate 
-        heart_html = f"""
-        <style>
-        @keyframes pulse {{
-            0% {{ transform: scale(1); }}
-            15% {{ transform: scale(1.25); }} /* S1 (Lub) */
-            30% {{ transform: scale(1); }}
-            45% {{ transform: scale(1.15); }} /* S2 (Dub) */
-            60% {{ transform: scale(1); }}
-            100% {{ transform: scale(1); }}
-        }}
-        .heart-container {{
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 120px;
-            margin: 12px 0 20px;
-        }}
-        .pulsing-heart {{
-            display: inline-block;
-            line-height: 1;
-            font-size: 70px;
-            animation: pulse {pulse_duration}s infinite;
-            transform-origin: center;
-        }}
-        </style>
-        <div class="heart-container">
-            <div class="pulsing-heart">🫀</div>
-        </div>
-        """
-        st.markdown(heart_html, unsafe_allow_html=True)
+        st.components.v1.html(heart_animation_html(heart_rate), height=294)
 
     # Show timing across the whole clip without overlapping per-beat annotations.
     fig5, ax5 = plt.subplots(figsize=(14, 4.5), constrained_layout=True)
