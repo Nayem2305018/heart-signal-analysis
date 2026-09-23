@@ -31,6 +31,12 @@ The **Frequency filter** tool offers low pass, high pass, band pass, and band
 stop filters with adjustable cutoff frequencies. It plays the original and
 filtered clips side by side and shows their waveforms and spectra.
 
+The **Compare** tool can align a second recording automatically from its
+loudness pattern or by a manual time shift. It reports the shared duration,
+waveform correlation, level difference, and RMS difference, and lets you play
+or download the difference track. Automatic alignment searches up to 10 seconds
+in either direction and may be uncertain for unrelated or repetitive audio.
+
 Audio is converted to mono for analysis. Files must be between 0.1 seconds and
 5 minutes. The noise remover uses a spectral gate, the pitch tuner analyzes a
 short window at the selected time, and beat detection uses spectral onset

@@ -200,6 +200,93 @@ def spectrum_db(audio: np.ndarray, sample_rate: int) -> tuple[np.ndarray, np.nda
     return frequencies, 10 * np.log10(power + 1e-12)
 
 
+def estimate_alignment(first: np.ndarray, second: np.ndarray, sample_rate: int,
+                       max_shift_seconds: float = 10.0) -> tuple[float, float] | None:
+    """Estimate how far to shift the second clip using 100 Hz loudness envelopes."""
+    if (not np.isfinite(sample_rate) or sample_rate <= 0
+            or not np.isfinite(max_shift_seconds) or max_shift_seconds < 0):
+        raise ValueError("Sample rate and shift range must be valid.")
+    hop = max(1, round(sample_rate / 100))
+
+    def envelope(audio: np.ndarray) -> np.ndarray:
+        blocks = audio[:len(audio) // hop * hop].reshape(-1, hop)
+        return np.mean(np.abs(blocks), axis=1, dtype=np.float64)
+
+    a, b = envelope(first), envelope(second)
+    if min(len(a), len(b)) < 100 or np.std(a) < 1e-5 or np.std(b) < 1e-5:
+        return None
+    lags = signal.correlation_lags(len(a), len(b), mode="full")
+    permitted = np.abs(lags) <= round(max_shift_seconds * sample_rate / hop)
+    lags = lags[permitted]
+    starts = np.maximum(0, lags)
+    ends = np.minimum(len(a), len(b) + lags)
+    counts = ends - starts
+    valid = counts >= max(100, min(len(a), len(b)) // 2)
+    if not np.any(valid):
+        return None
+    lags, starts, ends, counts = (item[valid] for item in (lags, starts, ends, counts))
+    second_starts, second_ends = starts - lags, ends - lags
+
+    def sums(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        total = np.r_[0.0, np.cumsum(values)]
+        squares = np.r_[0.0, np.cumsum(values * values)]
+        return total, squares
+
+    a_sum, a_sq = sums(a)
+    b_sum, b_sq = sums(b)
+    sum_a = a_sum[ends] - a_sum[starts]
+    sum_b = b_sum[second_ends] - b_sum[second_starts]
+    variance_a = np.maximum(0, a_sq[ends] - a_sq[starts] - sum_a ** 2 / counts)
+    variance_b = np.maximum(0, b_sq[second_ends] - b_sq[second_starts] - sum_b ** 2 / counts)
+    cross = signal.correlate(a, b, mode="full", method="fft")[permitted][valid]
+    denominator = np.sqrt(variance_a * variance_b)
+    scores = np.full(len(lags), -np.inf)
+    usable = denominator > 1e-10
+    scores[usable] = ((cross[usable] - sum_a[usable] * sum_b[usable] / counts[usable])
+                      / denominator[usable])
+    best = int(np.argmax(scores))
+    if not np.isfinite(scores[best]) or scores[best] < 0.35:
+        return None
+    return float(lags[best] * hop / sample_rate), float(np.clip(scores[best], -1, 1))
+
+
+def comparison_overlap(first: np.ndarray, second: np.ndarray,
+                       shift_samples: int) -> tuple[np.ndarray, np.ndarray, int]:
+    """Return matching samples after shifting the second clip on the first clip's timeline."""
+    start = max(0, shift_samples)
+    end = min(len(first), len(second) + shift_samples)
+    if end <= start:
+        return first[:0], second[:0], start
+    return first[start:end], second[start - shift_samples:end - shift_samples], start
+
+
+def comparison_stats(first: np.ndarray, second: np.ndarray
+                     ) -> tuple[float, float | None, float | None]:
+    """Return RMS difference, waveform correlation, and second-to-first level in dB."""
+    if len(first) == 0 or len(first) != len(second):
+        raise ValueError("Comparison requires equal, nonempty overlapping segments.")
+    sums = np.zeros(6, dtype=np.float64)
+    for start in range(0, len(first), 65536):
+        a = first[start:start + 65536].astype(np.float64)
+        b = second[start:start + 65536].astype(np.float64)
+        sums += (a.sum(), b.sum(), np.dot(a, a), np.dot(b, b),
+                 np.dot(a, b), np.dot(a - b, a - b))
+    count = len(first)
+    mean_a, mean_b = sums[0] / count, sums[1] / count
+    variance_a = max(0.0, sums[2] / count - mean_a ** 2)
+    variance_b = max(0.0, sums[3] / count - mean_b ** 2)
+    correlation = ((sums[4] / count - mean_a * mean_b) / np.sqrt(variance_a * variance_b)
+                   if variance_a > 1e-12 and variance_b > 1e-12 else None)
+    if correlation is not None:
+        correlation = float(np.clip(correlation, -1, 1))
+    rms_a, rms_b = np.sqrt(sums[2] / count), np.sqrt(sums[3] / count)
+    level_difference = (20 * np.log10(rms_b / rms_a)
+                        if rms_a > 1e-8 and rms_b > 1e-8 else None)
+    if level_difference is not None:
+        level_difference = float(level_difference)
+    return float(np.sqrt(sums[5] / count)), correlation, level_difference
+
+
 def detect_beats(audio: np.ndarray, sample_rate: int) -> np.ndarray:
     if sample_rate > 11025:
         divisor = math.gcd(sample_rate, 11025)

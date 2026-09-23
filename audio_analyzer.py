@@ -25,10 +25,10 @@ def _plot(fig, name: str, key: str) -> None:
 
 
 def _waveform(axis, audio: np.ndarray, sample_rate: int, label: str,
-              color: str = "#53ddcb") -> None:
+              color: str = "#53ddcb", offset_seconds: float = 0.0) -> None:
     step = max(1, len(audio) // 12000)
     indices = np.arange(0, len(audio), step)
-    axis.plot(indices / sample_rate, audio[::step], linewidth=0.6,
+    axis.plot(indices / sample_rate + offset_seconds, audio[::step], linewidth=0.6,
               label=label, color=color)
     axis.set_xlabel("Time (s)")
     axis.set_ylabel("Amplitude")
@@ -383,23 +383,86 @@ def render_audio_analyzer() -> None:
                     divisor = gcd(second_rate, sample_rate)
                     second = signal.resample_poly(second, sample_rate // divisor,
                                                   second_rate // divisor)
-                st.caption("The recordings are aligned at their starts; different sample rates are resampled.")
-                left, right = st.columns(2)
-                left.audio(dsp.playback_wav_bytes(audio, sample_rate), format="audio/wav")
-                right.audio(dsp.playback_wav_bytes(second, sample_rate), format="audio/wav")
-                fig, axes = plt.subplots(3, 1, figsize=(11, 8), constrained_layout=True)
-                _waveform(axes[0], audio, sample_rate, "First")
-                _waveform(axes[0], second, sample_rate, "Second", "#ff8398")
-                common = min(len(audio), len(second))
-                difference = audio[:common] - second[:common]
-                _waveform(axes[1], difference, sample_rate, "Amplitude difference", "#b9a1ff")
-                _spectrum(axes[2], audio, sample_rate, "First")
-                _spectrum(axes[2], second, sample_rate, "Second", "#ff8398")
-                first_freq, first_db = dsp.spectrum_db(audio, sample_rate)
-                second_freq, second_db = dsp.spectrum_db(second, sample_rate)
-                axes[2].fill_between(first_freq, first_db,
-                                     np.interp(first_freq, second_freq, second_db),
-                                     color="#b9a1ff", alpha=0.18, label="Frequency difference")
-                axes[2].legend(loc="upper right")
-                _plot(fig, "audio_comparison", "comparison_plot")
-                st.write(f"Aligned RMS difference: {np.sqrt(np.mean(difference ** 2)):.4f}")
+                    second = second.astype(np.float32)
+                    st.caption("Second recording resampled to match the first recording's sample rate.")
+                st.caption(f"Full lengths: first {duration:.2f} s · "
+                           f"second {len(second) / sample_rate:.2f} s")
+                alignment_mode = st.selectbox("Time alignment", ["Start together", "Automatic",
+                                                                   "Manual shift"])
+                shift_seconds = 0.0
+                if alignment_mode == "Automatic":
+                    estimate = dsp.estimate_alignment(audio, second, sample_rate)
+                    if estimate is None:
+                        st.info("No reliable alignment found within 10 seconds. "
+                                "Using the recording starts; try Manual shift.")
+                    else:
+                        shift_seconds, confidence = estimate
+                        st.caption(f"Estimated shift: {shift_seconds:+.2f} s "
+                                   f"(envelope correlation {confidence:.2f}). "
+                                   "Check the overlaid waveforms for a good match.")
+                elif alignment_mode == "Manual shift":
+                    shift_limit = float(min(30, max(duration, len(second) / sample_rate)))
+                    shift_seconds = st.slider("Shift second recording (seconds)",
+                                              -shift_limit, shift_limit, 0.0, 0.01)
+                    st.caption("Positive values delay the second recording; negative values move it earlier.")
+                shift_samples = round(shift_seconds * sample_rate)
+                first_part, second_part, overlap_start = dsp.comparison_overlap(
+                    audio, second, shift_samples)
+                if len(first_part) < max(2, int(0.1 * sample_rate)):
+                    st.warning("The recordings have too little overlap at this shift. Move them closer together.")
+                else:
+                    shift_seconds = shift_samples / sample_rate
+                    rms_difference, correlation, level_difference = dsp.comparison_stats(
+                        first_part, second_part)
+                    difference = first_part - second_part
+                    metric_a, metric_b, metric_c, metric_d = st.columns(4)
+                    metric_a.metric("Shared audio", f"{len(first_part) / sample_rate:.2f} s")
+                    metric_b.metric("Second shift", f"{shift_seconds:+.2f} s")
+                    metric_c.metric("Waveform correlation",
+                                    f"{correlation:.3f}" if correlation is not None else "Unavailable")
+                    metric_d.metric("Level difference",
+                                    f"{level_difference:+.2f} dB"
+                                    if level_difference is not None else "Unavailable")
+                    st.caption(f"RMS difference over the shared audio: {rms_difference:.5f}. "
+                               "Correlation compares waveform shape; level difference is second minus first.")
+
+                    first_col, second_col = st.columns(2)
+                    with first_col:
+                        st.caption("First recording · shared section")
+                        st.audio(dsp.playback_wav_bytes(first_part, sample_rate), format="audio/wav")
+                    with second_col:
+                        st.caption("Second recording · shared section")
+                        st.audio(dsp.playback_wav_bytes(second_part, sample_rate), format="audio/wav")
+                    difference_peak = float(np.max(np.abs(difference)))
+                    difference_audio = difference / max(1.0, difference_peak)
+                    st.caption("Difference track · sound remaining after subtracting the second recording")
+                    st.audio(dsp.playback_wav_bytes(difference_audio, sample_rate), format="audio/wav")
+                    if difference_peak > 1:
+                        st.caption("Difference audio was scaled to avoid clipping.")
+                    st.download_button("Download difference WAV", dsp.wav_bytes(difference_audio, sample_rate),
+                                       file_name="audio_difference.wav", mime="audio/wav",
+                                       key="comparison_difference_wav")
+
+                    fig, axes = plt.subplots(3, 1, figsize=(11, 8), constrained_layout=True)
+                    _waveform(axes[0], audio, sample_rate, "First")
+                    _waveform(axes[0], second, sample_rate, "Second", "#ff8398", shift_seconds)
+                    axes[0].axvspan(overlap_start / sample_rate,
+                                    (overlap_start + len(first_part)) / sample_rate,
+                                    color="#b9a1ff", alpha=0.08, label="Shared section")
+                    axes[0].legend(loc="upper right")
+                    axes[0].set_title("Aligned waveforms")
+                    _waveform(axes[1], difference, sample_rate, "Difference", "#b9a1ff",
+                              overlap_start / sample_rate)
+                    axes[1].set_title("Difference during shared audio")
+                    first_freq, first_db = dsp.spectrum_db(first_part, sample_rate)
+                    second_freq, second_db = dsp.spectrum_db(second_part, sample_rate)
+                    axes[2].plot(first_freq, first_db, label="First", color="#53ddcb")
+                    axes[2].plot(second_freq, second_db, label="Second", color="#ff8398")
+                    axes[2].fill_between(first_freq, first_db,
+                                         np.interp(first_freq, second_freq, second_db),
+                                         color="#b9a1ff", alpha=0.18, label="Frequency difference")
+                    axes[2].set(xlabel="Frequency (Hz)", ylabel="Power (dB/Hz)",
+                                title="Spectrum of shared audio")
+                    axes[2].set_xlim(0, min(10000, sample_rate / 2))
+                    axes[2].legend(loc="upper right")
+                    _plot(fig, "audio_comparison", "comparison_plot")
