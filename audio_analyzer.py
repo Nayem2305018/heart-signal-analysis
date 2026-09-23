@@ -105,7 +105,7 @@ def _live_visualizer() -> None:
       canvas{display:block;width:100%;border:1px solid #244353;border-radius:8px;background:#101c2a}
     </style>
     <div class="live-card">
-      <div class="live-toolbar"><button id="start">Start microphone</button>
+      <div class="live-toolbar"><button id="start">Start live display</button>
         <button id="stop" disabled>Stop</button><span id="status">Microphone idle</span></div>
       <div class="live-label">Waveform</div>
       <canvas id="wave" width="850" height="82"></canvas>
@@ -174,33 +174,73 @@ def _beat_player(audio: np.ndarray, sample_rate: int, beats: np.ndarray) -> None
     st.components.v1.html(html, height=190)
 
 
+def _store_recording() -> None:
+    recorded = st.session_state.get("general_recording")
+    if recorded is None:
+        return
+    data = recorded.getvalue()
+    try:
+        dsp.read_audio(data)
+    except Exception as exc:
+        st.session_state["general_recording_error"] = f"Could not read recording: {exc}"
+        return
+    st.session_state["general_recorded_bytes"] = data
+    st.session_state["general_recorder_open"] = False
+    st.session_state.pop("general_recording_error", None)
+
+
+def _record_another_clip() -> None:
+    st.session_state["general_recorder_open"] = True
+
+
+def _open_recording_analysis() -> None:
+    st.session_state["general_source"] = "Microphone recording"
+    st.session_state["audio_tool"] = "Analyze"
+
+
 def render_audio_analyzer() -> None:
     render_hero("audio")
     mode = st.sidebar.radio("Audio tool", ["Live", "Analyze", "Noise & EQ",
                              "Rooms & effects", "Beats & pitch",
-                             "Spectrogram painter", "Compare"])
+                             "Spectrogram painter", "Compare"], key="audio_tool")
+    live_enabled = False
     if mode == "Live":
         st.subheader("Live sound visualizer")
-        _live_visualizer()
-        st.caption("Use the recorder below to capture a clip for the analysis tools. Browser microphone permission is required.")
-        recorded = st.audio_input("Record from microphone", key="general_recording")
-        if recorded is not None:
-            recording_bytes = recorded.getvalue()
-            if recording_bytes != st.session_state.get("general_recorded_bytes"):
-                st.session_state["general_recorded_bytes"] = recording_bytes
-                st.session_state["general_source"] = "Microphone recording"
+        live_enabled = st.toggle("Show live display", value=False)
+        if live_enabled:
+            _live_visualizer()
+        st.caption("Turn off the live display before recording. Use the sidebar recorder to capture audio, then open Analyze or another tool.")
 
     with st.sidebar:
         st.header("Audio source")
+        microphone_bytes = st.session_state.get("general_recorded_bytes")
+        recorder_open = st.session_state.get("general_recorder_open", microphone_bytes is None)
+        if recorder_open:
+            st.audio_input("Record from microphone", key="general_recording",
+                           on_change=_store_recording)
+            if "general_recording_error" in st.session_state:
+                st.warning(st.session_state["general_recording_error"])
+        if microphone_bytes is not None:
+            st.caption("Recording saved. Play it back or choose a tool below.")
+            st.audio(microphone_bytes, format="audio/wav")
+            if not recorder_open:
+                st.button("Record another clip", on_click=_record_another_clip,
+                          key="record_another_clip")
+            st.button("Analyze recording", on_click=_open_recording_analysis,
+                      key="analyze_recording")
         uploaded = st.file_uploader("Upload WAV, FLAC, OGG, or MP3", type=["wav", "flac", "ogg", "mp3"],
                                     key="general_audio")
         st.caption("Recordings up to 5 minutes")
         source_choice = st.radio("Use", ["Uploaded file", "Microphone recording"],
+                                 index=1 if microphone_bytes is not None else 0,
                                  key="general_source")
-    source = (uploaded.getvalue() if uploaded is not None else None) if source_choice == "Uploaded file" else st.session_state.get("general_recorded_bytes")
+    if source_choice == "Uploaded file":
+        source = uploaded.getvalue() if uploaded is not None else None
+    else:
+        source = microphone_bytes
     if source is None:
         render_empty_state("Choose an audio source",
-                           "Upload a file in the sidebar or record a clip in the Live tool to begin.")
+                           "Upload a file or record a clip with the microphone control in the sidebar to begin.")
         return
     try:
         audio, sample_rate = dsp.read_audio(source)

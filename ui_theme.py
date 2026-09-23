@@ -105,7 +105,7 @@ STYLES = """
       radial-gradient(circle at 82% 45%, rgba(251, 113, 133, .18), transparent 18rem),
       linear-gradient(115deg, #263445, #142a3b 58%, #24293c);
   }
-  .hero__content { position: relative; z-index: 1; max-width: 720px; }
+  .hero__content { position: relative; z-index: 1; max-width: min(720px, calc(100% - 230px)); }
   .hero__eyebrow {
     color: #73e8d8;
     text-transform: uppercase;
@@ -234,10 +234,13 @@ STYLES = """
   }
   .empty-panel h3 { font-size: 1.3rem !important; margin: .45rem 0 .3rem; }
   .empty-panel p { color: var(--muted); margin: 0; }
+  @media (max-width: 1100px) {
+    .hero__content { max-width: 100%; }
+    .hero__art { display: none; }
+  }
   @media (max-width: 950px) {
     [data-testid="stAppViewContainer"] > .main .block-container { padding: 2rem 1.25rem 3rem; }
     .hero { padding: 1.7rem; min-height: 220px; }
-    .hero__art { opacity: .2; right: 1rem; }
   }
 </style>
 """
