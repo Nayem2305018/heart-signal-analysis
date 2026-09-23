@@ -11,11 +11,19 @@ from models.transforms import design_analog_filter, design_digital_filter, check
 from models.filters import apply_bandpass_filter
 from models.peak_detection import get_envelope, detect_peaks, classify_s1_s2, calculate_heart_rate
 from views.plots import create_animated_waveform_gif
+from ui_theme import apply_theme, render_empty_state, render_hero, render_sidebar_brand
 
 
-st.set_page_config(page_title="Heart Sound Analyzer", layout="wide")
-st.title("🫀 Heart Sound (PCG) Signal Analyzer")
-st.write("Upload a heart sound `.wav` file to analyze its waveform, spectrum, filter it, and detect heartbeats.")
+st.set_page_config(page_title="Signal Studio", page_icon="🎛️", layout="wide")
+apply_theme()
+render_sidebar_brand()
+page = st.sidebar.radio("Workspace", ["Heart sounds", "Audio analyzer"])
+if page == "Audio analyzer":
+    from audio_analyzer import render_audio_analyzer
+
+    render_audio_analyzer()
+    st.stop()
+render_hero("heart")
 
 
 # ---------- File upload ----------
@@ -91,19 +99,19 @@ if uploaded_file is not None:
     st.write(f"**Filter stability:** {'✅ Stable' if is_stable else '❌ Unstable'}")
 
     # Pole-zero plot
-    fig3, ax3 = plt.subplots(figsize=(5, 5))
-    ax3.scatter(poles_d.real, poles_d.imag, marker='x', s=100, color='red', label='Poles')
-    ax3.scatter(zeros_d.real, zeros_d.imag, marker='o', s=100, facecolors='none', edgecolors='blue', label='Zeros')
-    ax3.axhline(0, color='gray', linewidth=0.5)
-    ax3.axvline(0, color='gray', linewidth=0.5)
-    circle = plt.Circle((0, 0), 1, fill=False, linestyle='--', color='gray')
-    ax3.add_patch(circle)
-    ax3.set_title("Z-Plane Pole-Zero Plot")
-    ax3.set_xlabel("Real")
-    ax3.set_ylabel("Imaginary")
-    ax3.legend()
-    ax3.axis('equal')
-    st.pyplot(fig3)
+    # fig3, ax3 = plt.subplots(figsize=(5, 5))
+    # ax3.scatter(poles_d.real, poles_d.imag, marker='x', s=100, color='red', label='Poles')
+    # ax3.scatter(zeros_d.real, zeros_d.imag, marker='o', s=100, facecolors='none', edgecolors='blue', label='Zeros')
+    # ax3.axhline(0, color='gray', linewidth=0.5)
+    # ax3.axvline(0, color='gray', linewidth=0.5)
+    # circle = plt.Circle((0, 0), 1, fill=False, linestyle='--', color='gray')
+    # ax3.add_patch(circle)
+    # ax3.set_title("Z-Plane Pole-Zero Plot")
+    # ax3.set_xlabel("Real")
+    # ax3.set_ylabel("Imaginary")
+    # ax3.legend()
+    # ax3.axis('equal')
+    # st.pyplot(fig3)
 
     # ---------- Apply filter ----------
     filtered_signal = apply_bandpass_filter(signal, b_d, a_d)
@@ -112,7 +120,7 @@ if uploaded_file is not None:
     fig4, (ax4a, ax4b) = plt.subplots(2, 1, figsize=(12, 5))
     ax4a.plot(time, signal, linewidth=0.5)
     ax4a.set_title("Original")
-    ax4b.plot(time, filtered_signal, linewidth=0.5, color='green')
+    ax4b.plot(time, filtered_signal, linewidth=0.5, color='#53ddcb')
     ax4b.set_title(f"Filtered ({low_cutoff}-{high_cutoff} Hz)")
     ax4b.set_xlabel("Time (s)")
     st.pyplot(fig4)
@@ -141,17 +149,6 @@ if uploaded_file is not None:
         irregularity = np.std(intervals) / np.mean(intervals)
     else:
         irregularity = 0.0
-
-    # Feature: Plain-Language Verdict Banner
-    if len(s1_times) > 2:
-        # Note: A healthy S1-to-S1 CV is usually very low (under 0.10). 
-        # I lowered the threshold slightly to 0.15 to be more accurate.
-        if irregularity > 0.15: 
-            st.error(f"### ⚠️ {heart_rate} BPM — Irregular rhythm detected\n*(Variability CV = {irregularity:.2f})*")
-        else:
-            st.success(f"### ❤️ {heart_rate} BPM — Regular rhythm\n*(Variability CV = {irregularity:.2f})*")
-    else:
-        st.warning("Not enough full beats detected to assess rhythm regularity.")
 
     # Feature: Plain-Language Verdict Banner
     if len(peak_times) > 2:
@@ -197,7 +194,7 @@ if uploaded_file is not None:
 
     # Feature: Annotated Waveform "Story" Overlay
     fig5, ax5 = plt.subplots(figsize=(14, 5))
-    ax5.plot(time, filtered_signal, linewidth=0.6, color='#1f77b4')
+    ax5.plot(time, filtered_signal, linewidth=0.6, color='#53ddcb')
 
     # Stable Y-limit calculations using absolute span
     y_min, y_max = ax5.get_ylim()
@@ -229,7 +226,7 @@ if uploaded_file is not None:
     for t, label in zip(peak_times, labels):
         idx = int(t * sample_rate)
         if idx < len(filtered_signal):
-            color = 'red' if label == "S1" else 'green'
+            color = '#ff8398' if label == "S1" else '#53ddcb'
             ax5.scatter(t, filtered_signal[idx], color=color, zorder=5)
             ax5.annotate(label, (t, filtered_signal[idx]), textcoords="offset points", 
                          xytext=(0, 8), ha='center', fontweight='bold')
@@ -253,4 +250,5 @@ if uploaded_file is not None:
     plt.close('all')
 
 else:
-    st.info("👆 Upload a .wav file to begin analysis.")
+    render_empty_state("Start with a heart sound recording",
+                       "Upload a WAV file above to explore its waveform, spectrum, filtering, and beat markers.")
