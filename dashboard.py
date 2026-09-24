@@ -23,21 +23,23 @@ HEART_ANALYSIS_SECONDS = 20
 st.set_page_config(page_title="Signal Studio", page_icon="🎛️", layout="wide")
 apply_theme()
 render_sidebar_brand()
-page = st.sidebar.radio("Workspace", ["Heart sounds", "Audio analyzer", "Audio encryption", "Steganography"])
+page = st.sidebar.radio("Workspace", ["Heart sounds", "Audio analyzer", "Audio encryption", "Steganography", "Echo Detector"])
 if page == "Audio analyzer":
     from audio_analyzer import render_audio_analyzer
-
     render_audio_analyzer()
     st.stop()
-if page == "Audio encryption":                 # <-- NEW: add this block
+if page == "Audio encryption":                
     from crypto_page import render_audio_crypto
     render_audio_crypto()
     st.stop()
-if page == "Steganography":                       # <-- NEW: only addition
+if page == "Steganography":                       
     from steganography_page import render_steganography
     render_steganography()
     st.stop()
-
+if page == "Echo Detector":                      
+    from echo_detector_page import render_echo_detector
+    render_echo_detector()
+    st.stop()
 render_hero("heart")
 
 
