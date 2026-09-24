@@ -282,14 +282,14 @@ def render_hero(workspace: str) -> None:
     if workspace == "heart":
         variant = " hero--heart"
         eyebrow = "Heart sound workspace"
-        title = "Explore every heartbeat."
-        description = "See the waveform, isolate heart sounds, and follow the rhythm in your recording."
+        title = "Listen closer to heart sounds"
+        description = "Upload a recording to see the sound waves, filter the audio, and check the timing between beats."
         tags = ("PCG analysis", "Filtering", "Beat markers")
     else:
         variant = ""
         eyebrow = "Audio analysis workspace"
-        title = "Make sound visible."
-        description = "Record, inspect, shape, and compare audio in one interactive workspace."
+        title = "Explore your audio"
+        description = "Record or upload a clip, see what it sounds like on a graph, and try the editing tools."
         tags = ("Live microphone", "Spectrogram", "Effects", "Export")
     bars = "".join("<span></span>" for _ in range(11))
     pills = "".join(f'<span class="hero__tag">{tag}</span>' for tag in tags)
@@ -305,6 +305,6 @@ def render_hero(workspace: str) -> None:
 
 def render_empty_state(title: str, message: str) -> None:
     st.html(
-        '<div class="empty-panel"><div class="empty-panel__eyebrow">Ready when you are</div>'
+        '<div class="empty-panel"><div class="empty-panel__eyebrow">Get started</div>'
         f'<h3>{title}</h3><p>{message}</p></div>'
     )

@@ -1,46 +1,46 @@
-# Signal Analyzer
+# Signal Studio
 
-The Streamlit dashboard has two pages: the existing heart sound analyzer and a
-general audio analyzer. Run it with:
+Signal Studio is a small Streamlit app for exploring sound. You can upload a
+recording, see what is happening in it, make changes, and download the result.
+
+## Run it
 
 ```powershell
-pip install -r requirements.txt
-streamlit run dashboard.py
+python -m pip install -r requirements.txt
+python -m streamlit run dashboard.py
 ```
 
-Run the audio processing checks with `python -m unittest discover -s tests`.
+Use the same Python interpreter for both commands. To run the checks:
 
-On **Heart sounds**, upload a WAV file. All heart-sound plots and beat timing
-use up to the first 20 seconds of the recording (the optional animated GIF uses
-five seconds). An eight-second file provides eight seconds of analysis.
-The app estimates S1 and S2 from locally consistent alternating cycles. It
-reports an estimated BPM after two S1-to-S1 intervals and an interval
-coefficient of variation (CV) after three. Ambiguous or insufficient detections
-produce no timing estimate. The numbers describe acoustic timing; they do not
-diagnose a regular rhythm or an arrhythmia.
+```powershell
+python -m unittest discover -s tests
+```
 
-Choose **Audio analyzer** in the sidebar. Upload a WAV, FLAC, OGG, or MP3 file,
-or record a clip with the microphone control on that page. A successful clip
-replaces the recorder with a playback preview; select **Analyze recording** to
-open its analysis, or **Record another clip** to replace it. The live waveform,
-frequency bars, and spectrogram use browser microphone access for display;
-turn that display off before recording. Each analysis plot has a PNG download;
-edited sounds have WAV downloads.
+## What's in the app
 
-The **Frequency filter** tool offers low pass, high pass, band pass, and band
-stop filters with adjustable cutoff frequencies. It plays the original and
-filtered clips side by side and shows their waveforms and spectra.
+**Heart sounds:** Upload a WAV recording to see its waveform and strongest
+frequencies. You can filter the sound, listen to the result, and see where the
+app found possible S1 and S2 sounds. Beat timing uses up to the first 20 seconds;
+the optional animation uses the first five. The timing is an estimate from the
+audio, not a medical diagnosis.
 
-The **Compare** tool can align a second recording automatically from its
-loudness pattern or by a manual time shift. It reports the shared duration,
-waveform correlation, level difference, and RMS difference, and lets you play
-or download the difference track. Automatic alignment searches up to 10 seconds
-in either direction and may be uncertain for unrelated or repetitive audio.
+**Audio analyzer:** Upload a WAV, FLAC, OGG, or MP3 file, or record a clip with
+your microphone. The tools let you see the waveform and spectrogram, filter
+frequencies, reduce background noise, adjust bass and treble, try room sounds
+and effects, find beats or pitch, quiet a selected part of the spectrogram, and
+compare two recordings. Turn off the live display before using the recorder.
+Clips must be between 0.1 seconds and five minutes long.
 
-Audio is converted to mono for analysis. Files must be between 0.1 seconds and
-5 minutes. The noise remover uses a spectral gate, the pitch tuner analyzes a
-short window at the selected time, and beat detection uses spectral onset
-peaks. Long spectrograms use a bounded visual preview; edits still process the
-full recording. Players convert low sample rate audio to 16 kHz PCM WAV for
-browser playback; analysis and WAV downloads retain their original sample rate.
-These results are estimates and depend on the recording quality.
+**Audio encryption:** Pick a password to turn an audio file into an encrypted
+WAV. Keep that WAV and your password. Upload it in the Decrypt tab to get the
+original file back exactly. Converting the encrypted WAV to a lossy format such
+as MP3 will stop decryption from working.
+
+**Steganography:** Add a short text message to a WAV file and download the new
+recording. Upload that recording later to read the message. The text is hidden
+in the audio's frequency data, but it is not password protected; anyone with
+the extraction tool can read it.
+
+**Echo detector:** Upload a WAV or MP3 file and choose the delay range to check.
+The app looks for sound that repeats after a delay. Repeated music or beats can
+look like an echo, so treat those results with care.

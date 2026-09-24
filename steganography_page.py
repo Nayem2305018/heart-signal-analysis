@@ -51,22 +51,21 @@ def _plot_spectrum_compare(original, stego, sample_rate, title_a="Original Spect
 
 
 def render_steganography():
-    st.title("🕵️ Audio Steganography (FFT-Based)")
+    st.title("Hide a message in audio")
     st.write(
-        "Hide a secret text message inside a WAV file's **frequency-domain "
-        "representation** using FFT, or extract a previously hidden message "
-        "from a stego audio file. This is an educational demonstration of "
-        "frequency-domain data embedding -- not cryptographically secure "
-        "communication."
+        "Add a short message to a WAV recording, then download the new file. "
+        "You can upload that file here later to read the message. The app "
+        "changes small parts of the sound's frequency data to store the text. "
+        "Anyone with this tool can read it, so don't use it for private messages."
     )
 
     tab_hide, tab_extract = st.tabs(["🔐 Hide Message", "🔓 Extract Message"])
 
     # ==================== HIDE ====================
     with tab_hide:
-        st.subheader("Hide a secret message in a WAV file")
+        st.subheader("Add a message to a WAV file")
 
-        cover_file = st.file_uploader("Upload cover audio (.wav)", type=["wav"], key="stego_cover")
+        cover_file = st.file_uploader("Upload a WAV recording", type=["wav"], key="stego_cover")
         secret_message = st.text_area(
             "Secret message", placeholder="Type your secret message here...", key="stego_msg"
         )
@@ -80,8 +79,7 @@ def render_steganography():
 
             info = get_capacity_info(cover_signal)
             st.caption(
-                f"This file can hold up to **{info['capacity_chars']} characters** "
-                f"({info['capacity_bits']} raw bits of capacity)."
+                f"This recording has room for about **{info['capacity_chars']} characters**."
             )
 
         if st.button("🔐 Hide Message", key="do_hide"):
@@ -100,32 +98,32 @@ def render_steganography():
 
                 stego_wav_bytes = _wav_bytes(stego_signal, cover_sr)
 
-                st.write("**Stego audio:**")
+                st.write("**Recording with your message:**")
                 st.audio(stego_wav_bytes, format="audio/wav")
 
                 base_name = cover_file.name.rsplit(".", 1)[0]
                 st.download_button(
-                    "⬇️ Download Stego Audio",
+                    "⬇️ Download recording with message",
                     data=stego_wav_bytes,
                     file_name=f"{base_name}_stego.wav",
                     mime="audio/wav",
                 )
 
-                with st.expander("📊 Show visualizations (waveform & spectrum comparison)"):
+                with st.expander("📊 Compare the original and new recording"):
                     st.pyplot(_plot_waveform_compare(cover_signal, stego_signal, cover_sr))
                     st.pyplot(_plot_spectrum_compare(cover_signal, stego_signal, cover_sr))
                     max_diff = float(np.max(np.abs(
                         (stego_signal if stego_signal.ndim == 1 else stego_signal[:, 0])
                         - (cover_signal if cover_signal.ndim == 1 else cover_signal[:, 0])
                     )))
-                    st.caption(f"Maximum sample-level change introduced: {max_diff:.5f} "
-                               f"(out of a -1.0 to 1.0 range) -- a small, mostly inaudible change.")
+                    st.caption(f"Largest change to an audio sample: {max_diff:.5f} "
+                               "on a scale from -1 to 1. Listen to the file to judge how it sounds.")
 
     # ==================== EXTRACT ====================
     with tab_extract:
-        st.subheader("Extract a hidden message from a stego WAV file")
+        st.subheader("Read a message from a WAV file")
 
-        stego_file = st.file_uploader("Upload stego audio (.wav)", type=["wav"], key="stego_extract_upload")
+        stego_file = st.file_uploader("Upload a WAV with a hidden message", type=["wav"], key="stego_extract_upload")
 
         if st.button("🔓 Extract Message", key="do_extract"):
             if stego_file is None:
@@ -144,4 +142,4 @@ def render_steganography():
                     st.stop()
 
                 st.success("✓ Secret message successfully extracted.")
-                st.text_area("Recovered Secret Message", value=recovered_message, height=100, disabled=True)
+                st.text_area("Message in the recording", value=recovered_message, height=100, disabled=True)

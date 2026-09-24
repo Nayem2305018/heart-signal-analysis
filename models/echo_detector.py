@@ -141,8 +141,7 @@ def detect_echo_single(signal, sample_rate,
         result.update({
             "status": "no_echo", "detected": False, "delay_ms": None,
             "strength": None, "prominence": None,
-            "message": "No significant secondary correlation peak was found "
-                       "in the configured delay range.",
+            "message": "No clear echo was found in the delay range you chose.",
         })
         return result
 
@@ -154,11 +153,9 @@ def detect_echo_single(signal, sample_rate,
         "detected": True, "delay_ms": delay_ms, "delay_samples": peak["lag"],
         "strength": peak["strength"], "prominence": peak["prominence"],
         "message": (
-            "A clear secondary correlation peak was found -- echo detected."
+            "A clear echo appears in this recording."
             if confident else
-            "A secondary correlation peak was found just above the "
-            "detection threshold -- treat this as a possible echo, not a "
-            "confident detection."
+            "There may be an echo, but the match is weak."
         ),
     })
     return result
@@ -215,8 +212,7 @@ def detect_echo_multiframe(signal, sample_rate,
             "status": "no_echo", "detected": False, "delay_ms": None,
             "strength": None, "prominence": None, "consistency": 0.0,
             "frames_analyzed": len(frame_results), "frames_with_peak": 0,
-            "message": "No significant secondary correlation peak was found "
-                       "in any analyzed frame.",
+            "message": "No clear echo was found in the parts of the recording we checked.",
             "autocorrelation": frame_results[0]["autocorrelation"],
             "min_lag": frame_results[0]["min_lag"], "max_lag": frame_results[0]["max_lag"],
             "sample_rate": sample_rate, "corr_threshold": corr_threshold,
@@ -243,12 +239,11 @@ def detect_echo_multiframe(signal, sample_rate,
         "consistency": consistency, "frames_analyzed": len(frame_results),
         "frames_with_peak": len(consistent),
         "message": (
-            f"A consistent delay of ~{median_delay:.0f} ms appeared in "
-            f"{len(consistent)}/{len(frame_results)} analyzed frames -- echo detected."
+            f"An echo about {median_delay:.0f} ms later appeared in "
+            f"{len(consistent)} of {len(frame_results)} sections checked."
             if confident else
-            f"A delay near {median_delay:.0f} ms appeared in some frames, but "
-            "strength or consistency was below the confident threshold -- "
-            "treat this as a possible echo."
+            f"A possible echo about {median_delay:.0f} ms later appeared in some "
+            "sections, but the match was too weak or inconsistent to be sure."
         ),
         "autocorrelation": representative["autocorrelation"],
         "min_lag": representative["min_lag"], "max_lag": representative["max_lag"],

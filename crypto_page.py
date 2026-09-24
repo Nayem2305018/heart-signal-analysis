@@ -28,12 +28,11 @@ def _guess_mime(filename: str) -> str:
 
 
 def render_audio_crypto():
-    st.title("🔐 Audio File Encryption (AES-GCM)")
+    st.title("Password-protect an audio file")
     st.write(
-        "Encrypts the raw bytes of your audio file with AES-256-GCM "
-        "(authenticated encryption). Decryption returns the **exact original "
-        "file** -- same format, same quality, byte-for-byte -- ready to play "
-        "or save."
+        "Choose an audio file and a password to make an encrypted WAV. "
+        "To get the original file back, upload that WAV in the Decrypt tab "
+        "and enter the same password. Its format and contents are restored exactly."
     )
 
     tab_encrypt, tab_decrypt = st.tabs(["🔒 Encrypt", "🔓 Decrypt"])
@@ -63,10 +62,11 @@ def render_audio_crypto():
                     raw_bytes, plain_file.name, enc_password
                 )
 
-                st.success(f"✅ File encrypted ({len(encrypted_signal)} int16 samples).")
+                st.success("File encrypted. Download the WAV to keep it.")
 
                 encrypted_wav_bytes = _wav_bytes_from_signal(encrypted_signal)
 
+                st.caption("The encrypted recording will sound like noise.")
                 st.audio(encrypted_wav_bytes, format="audio/wav")
 
                 st.download_button(
@@ -78,11 +78,10 @@ def render_audio_crypto():
 
     # ---------------- DECRYPT ----------------
     with tab_decrypt:
-        st.subheader("Decrypt back to the original file")
+        st.subheader("Get your original file back")
         st.caption(
-            "Upload the `.wav` produced by the Encrypt tab. It must be the "
-            "exact lossless file -- re-saving it as MP3/OGG would corrupt the "
-            "ciphertext."
+            "Use the WAV downloaded from the Encrypt tab. Keep it as a WAV; "
+            "converting it to MP3 or OGG will prevent decryption."
         )
 
         enc_file = st.file_uploader(
@@ -114,7 +113,7 @@ def render_audio_crypto():
                     st.error(f"❌ {e}")
                     st.stop()
 
-                st.success(f"✅ Decrypted successfully -- recovered '{original_filename}' exactly.")
+                st.success(f"Decrypted. Your original file, '{original_filename}', is ready to download.")
 
                 mime = _guess_mime(original_filename)
                 st.audio(original_bytes, format=mime)

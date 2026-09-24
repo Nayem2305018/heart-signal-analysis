@@ -67,6 +67,7 @@ if source_bytes is not None:
 
     # ---------- Basic properties ----------
     st.header("1. Signal Properties")
+    st.caption("A quick look at the recording's length and sample rate.")
     props = get_signal_properties(signal, sample_rate)
     col1, col2, col3 = st.columns(3)
     col1.metric("Sample Rate", f"{props['sample_rate']} Hz")
@@ -75,6 +76,7 @@ if source_bytes is not None:
 
     # ---------- Waveform ----------
     st.subheader("Raw Waveform")
+    st.caption("This shows how the sound changes over time.")
     fig1, ax1 = plt.subplots(figsize=(12, 3.5), constrained_layout=True)
     time = np.arange(len(signal)) / sample_rate
     ax1.plot(time, signal, linewidth=0.6)
@@ -84,6 +86,7 @@ if source_bytes is not None:
 
     # ---------- Animated Waveform (GIF) ----------
     st.subheader("Animated Waveform")
+    st.caption("Make a short animation from the first five seconds of the recording.")
     if st.button("Generate Animated GIF"):
         with st.spinner("Generating animation... (this takes a few seconds)"):
             os.makedirs("outputs", exist_ok=True)
@@ -101,6 +104,7 @@ if source_bytes is not None:
 
     # ---------- FFT Spectrum ----------
     st.header("2. Frequency Spectrum (FFT)")
+    st.caption("See which frequencies are strongest in the recording.")
     freqs, magnitude, phase = compute_fft(signal, sample_rate)
 
     fig2, ax2 = plt.subplots(figsize=(12, 3.5), constrained_layout=True)
@@ -112,6 +116,7 @@ if source_bytes is not None:
 
     # ---------- Filter design (interactive sliders) ----------
     st.header("3. Bandpass Filter Design (Laplace + Z-Transform)")
+    st.caption("Choose the range of frequencies to keep, then listen to the filtered sound.")
     col1, col2 = st.columns(2)
     low_cutoff = col1.slider("Low cutoff (Hz)", 5, 100, 20)
     high_cutoff = col2.slider("High cutoff (Hz)", 100, 300, 150)
@@ -160,6 +165,7 @@ if source_bytes is not None:
 
     # ---------- 4. Beat timing ----------
     st.header("4. Beat Timing Analysis")
+    st.caption("The app looks for the two main heart sounds and estimates the time between beats.")
     
     envelope = get_envelope(filtered_signal, sample_rate)
     peaks, _ = detect_peaks(envelope, sample_rate)
@@ -189,10 +195,8 @@ if source_bytes is not None:
         if any(label == "Unclassified" for label in labels):
             st.caption("Only the locally consistent cycle run was used; other detected sounds are shown as candidates below.")
 
-    st.caption("Timing analysis uses up to the first 20 seconds of the recording. "
-               "These are estimates from heart-sound timing, not a diagnosis of rhythm. "
-               "S1/S2 labels and the shaded spans are approximate; "
-               "an ECG is used to assess suspected arrhythmia.")
+    st.caption("Only the first 20 seconds are used. The sound labels and timing are estimates, "
+               "not a diagnosis. If you're concerned about an irregular heartbeat, seek a medical assessment.")
 
     # Feature: Synchronized Heart Animation
     if heart_rate:

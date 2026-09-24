@@ -209,7 +209,7 @@ def render_audio_analyzer() -> None:
         live_enabled = st.toggle("Show live display", value=False)
         if live_enabled:
             _live_visualizer()
-        st.caption("Turn off the live display before recording. Use the sidebar recorder to capture audio, then open Analyze or another tool.")
+        st.caption("Watch the sound around you as it happens. Turn this display off before recording a clip in the sidebar.")
 
     with st.sidebar:
         st.header("Audio source")
@@ -252,6 +252,7 @@ def render_audio_analyzer() -> None:
 
     if mode == "Analyze":
         st.subheader("Audio file analyzer")
+        st.caption("Listen to the clip and see its waveform, loudness, frequencies, and spectrogram.")
         a, b, c = st.columns(3)
         a.metric("Duration", f"{duration:.2f} s")
         b.metric("Sample rate", f"{sample_rate:,} Hz")
@@ -271,7 +272,7 @@ def render_audio_analyzer() -> None:
 
     if mode == "Frequency filter":
         st.subheader("Frequency filter")
-        st.write("Choose which frequencies to keep or remove, then compare the sound and spectrum.")
+        st.write("Pick the frequencies you want to keep or remove. Listen to the result beside the original.")
         highest_hz = int(min(20000, np.floor(sample_rate * 0.475)))
         if highest_hz < 21:
             st.warning("This recording's sample rate is too low for the frequency filter controls.")
@@ -302,10 +303,12 @@ def render_audio_analyzer() -> None:
 
     if mode == "Noise & EQ":
         st.subheader("Noise remover")
+        st.caption("Reduce steady background noise, then compare the cleaned clip with the original.")
         strength = st.slider("Noise reduction", 0.0, 4.0, 1.5, 0.1)
         cleaned = dsp.denoise(audio, sample_rate, strength)
         _comparison(audio, cleaned, sample_rate, "noise_reduced", "denoise")
         st.subheader("Interactive equalizer")
+        st.caption("Turn the bass, middle, or treble up or down to change the sound.")
         bass = st.slider("Bass (dB)", -18, 18, 0)
         mids = st.slider("Mids (dB)", -18, 18, 0)
         treble = st.slider("Treble (dB)", -18, 18, 0)
@@ -314,6 +317,7 @@ def render_audio_analyzer() -> None:
 
     if mode == "Rooms & effects":
         st.subheader("Room simulator")
+        st.caption("Hear what the recording might sound like in a different space.")
         room = st.selectbox("Room", ["Small room", "Hall", "Tunnel"])
         wet = st.slider("Room mix", 0.0, 1.0, 0.5, 0.05)
         room_audio, impulse = dsp.room_simulate(audio, sample_rate, room, wet)
@@ -322,6 +326,7 @@ def render_audio_analyzer() -> None:
         _plot(fig, "room_echo_tail", "room_tail")
         _comparison(audio, room_audio, sample_rate, "room_simulated", "room")
         st.subheader("Audio effects playground")
+        st.caption("Try an effect and adjust how strongly it changes the clip.")
         kind = st.selectbox("Effect", ["Echo", "Delay", "Tremolo", "Distortion"])
         amount = st.slider("Effect amount", 0.0, 0.95, 0.5, 0.05)
         delay = st.slider("Delay / tremolo speed", 0.05, 1.0, 0.3, 0.05)
@@ -330,6 +335,7 @@ def render_audio_analyzer() -> None:
 
     if mode == "Beats & pitch":
         st.subheader("Beat visualizer")
+        st.caption("Lines on the waveform mark the beats the app found.")
         beats = dsp.detect_beats(audio, sample_rate)
         st.write(f"Detected beats: {len(beats)}")
         fig, ax = plt.subplots(figsize=(11, 3), constrained_layout=True)
@@ -339,6 +345,7 @@ def render_audio_analyzer() -> None:
         _plot(fig, "beats", "beats_plot")
         _beat_player(audio, sample_rate, beats)
         st.subheader("Pitch detector and tuner")
+        st.caption("Choose a point in the clip to check its note and tuning.")
         at = st.slider("Listen at (seconds)", 0.0, float(duration), min(duration / 2, 1.0),
                        0.01)
         result = dsp.detect_pitch(audio, sample_rate, at)
@@ -351,7 +358,7 @@ def render_audio_analyzer() -> None:
 
     if mode == "Spectrogram painter":
         st.subheader("Spectrogram painter")
-        st.write("Select a time and frequency region to attenuate, then listen to the result.")
+        st.write("Choose an area of the spectrogram to make quieter, then listen to the result.")
         fig, ax = plt.subplots(figsize=(11, 4), constrained_layout=True)
         image = _spectrogram(ax, audio, sample_rate)
         fig.colorbar(image, ax=ax, label="Magnitude (dB)")
@@ -369,6 +376,7 @@ def render_audio_analyzer() -> None:
 
     if mode == "Compare":
         st.subheader("Audio comparison")
+        st.caption("Add a second recording to see where they match and hear what's different.")
         second_file = st.file_uploader("Second WAV, FLAC, OGG, or MP3 recording",
                                        type=["wav", "flac", "ogg", "mp3"], key="second_audio")
         if second_file is not None:

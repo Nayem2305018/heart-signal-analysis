@@ -3,4 +3,5 @@ numpy
 scipy
 matplotlib
 soundfile>=0.12.1
+cryptography
 librosa

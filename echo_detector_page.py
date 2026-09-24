@@ -80,16 +80,15 @@ def _plot_spectrum(signal, sample_rate):
     ax.set_xlim(0, min(5000, sample_rate / 2))
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("Magnitude")
-    ax.set_title("Frequency Spectrum (supportive visualization)")
+    ax.set_title("Frequency spectrum")
     return fig
 
 
 def render_echo_detector():
-    st.title("🔊 Echo Detector")
+    st.title("Check for an echo")
     st.write(
-        "Analyzes an audio signal for a significant echo using **FFT-based "
-        "autocorrelation** -- not a simple frequency check. An echo shows up "
-        "as a secondary correlation peak at a non-zero time lag."
+        "Upload a recording to see whether a similar sound repeats after a "
+        "short delay. Set the delay range you want to check, then run the detector."
     )
     st.caption("Accepted formats: WAV, MP3")
 
@@ -99,11 +98,11 @@ def render_echo_detector():
     min_delay_ms = col1.number_input("Minimum echo delay (ms)", 1, 2000, MIN_DELAY_MS_DEFAULT)
     max_delay_ms = col2.number_input("Maximum echo delay (ms)", 10, 5000, MAX_DELAY_MS_DEFAULT)
     corr_threshold = col3.number_input("Correlation threshold", 0.01, 1.0,
-                                       CORR_THRESHOLD_DEFAULT, step=0.01, format="%.2f")
+                                       CORR_THRESHOLD_DEFAULT, step=0.01, format="%.2f",
+                                       help="Lower values can find weaker echoes, but may also flag repeated sounds.")
 
     use_multiframe = st.checkbox(
-        "Use multi-frame analysis (more reliable, checks consistency across "
-        "several overlapping segments)", value=True
+        "Check several parts of the recording for the same echo", value=True
     )
 
     if st.button("🔍 Detect Echo"):
@@ -156,25 +155,21 @@ def render_echo_detector():
                           help=f"{result.get('frames_with_peak', 0)}/"
                                f"{result.get('frames_analyzed', 1)} frames agreed")
             st.caption(
-                "Echo strength is an **estimated relative correlation strength**, "
-                "not necessarily the exact physical reflection amplitude."
+                "Echo strength shows how closely the delayed sound matches the "
+                "original. It does not measure the loudness of the reflection."
             )
 
         st.markdown("---")
         st.subheader("Visualizations")
         st.pyplot(_plot_waveform(signal, sample_rate))
         st.pyplot(_plot_autocorrelation(result))
-        with st.expander("Show frequency spectrum (supportive view)"):
+        with st.expander("Show frequency spectrum"):
             st.pyplot(_plot_spectrum(signal, sample_rate))
 
-        with st.expander("⚠ Known limitation"):
+        with st.expander("When results can be misleading"):
             st.write(
-                "Strongly periodic audio (drum loops, repeated musical "
-                "phrases, sustained rhythmic patterns) can sometimes produce "
-                "a correlation peak that looks like an echo, since periodic "
-                "signals are inherently self-similar at a delay. Multi-frame "
-                "consistency checking (enabled by default) reduces this risk "
-                "but cannot eliminate it entirely -- treat results on music "
-                "with extra caution. MP3 compression can also slightly shift "
-                "the estimated strength (though delay estimates remain accurate)."
+                "Repeated beats or musical phrases can look like an echo to this "
+                "detector. Checking several parts of the recording helps, but "
+                "music can still give a false result. MP3 compression may also "
+                "change the reported strength slightly."
             )
