@@ -3,5 +3,6 @@ heart_env/
 --pycache--/ 
 *.pyc 
 
-# Generated signal-processing presentation PDF
+# Generated signal-processing guide
 /output/pdf/signal_studio_guide.pdf
+/docs/signal_studio_guide.tex
