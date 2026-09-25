@@ -2,3 +2,6 @@ heart_env/
 *.zip 
 --pycache--/ 
 *.pyc 
+
+# Generated signal-processing presentation PDF
+/output/pdf/signal_studio_guide.pdf
