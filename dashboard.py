@@ -126,21 +126,6 @@ if source_bytes is not None:
 
     st.write(f"**Filter stability:** {'✅ Stable' if is_stable else '❌ Unstable'}")
 
-    # Pole-zero plot
-    fig3, ax3 = plt.subplots(figsize=(5, 5))
-    ax3.scatter(poles_d.real, poles_d.imag, marker='x', s=100, color='red', label='Poles')
-    ax3.scatter(zeros_d.real, zeros_d.imag, marker='o', s=100, facecolors='none', edgecolors='blue', label='Zeros')
-    ax3.axhline(0, color='gray', linewidth=0.5)
-    ax3.axvline(0, color='gray', linewidth=0.5)
-    circle = plt.Circle((0, 0), 1, fill=False, linestyle='--', color='gray')
-    ax3.add_patch(circle)
-    ax3.set_title("Z-Plane Pole-Zero Plot")
-    ax3.set_xlabel("Real")
-    ax3.set_ylabel("Imaginary")
-    ax3.legend()
-    ax3.axis('equal')
-    st.pyplot(fig3)
-
     # ---------- Apply filter ----------
     filtered_signal = apply_bandpass_filter(signal, b_d, a_d)
 
